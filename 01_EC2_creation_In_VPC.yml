@@ -1,0 +1,125 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Creating two instances one in public subnet with jenkins and Ansible installation and one private with Docker
+  and Tomcat running on it.
+Parameters:
+  RoleStackName:
+    Description: 'VPC-Stack Name'
+    Type: String 
+  EC2InstancePublicInstanceName:
+    Description: enter name for Public insatnce
+    Type: String
+    Default: JnekinsAndAnsibleServer
+  EC2InstancePrivateInstanceName:
+    Description: enter name for Private insatnce
+    Type: String
+    Default: DockerTomcatServer
+  Keyname1: 
+    Description: enter key name
+    Type: 'AWS::EC2::KeyPair::KeyName'
+  EnvironmentName:
+    Description: enter the environment name
+    Type: String
+
+Resources:
+  EC2InstancePublic:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      KeyName: !Ref Keyname1
+      ImageId: ami-0742b4e673072066f
+      InstanceType: t2.micro
+      SecurityGroupIds: 
+       - !Ref InstanceSecurityGroupPublic
+      SubnetId: 
+        Fn::ImportValue:
+          !Sub "${RoleStackName}-PublicSubnet1"
+
+      UserData: 
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash
+            sudo yum update -y
+            sudo wget -O /etc/yum.repos.d/jenkins.repo http://pkg.jenkins-ci.org/redhat/jenkins.repo
+            sudo rpm --import https://pkg.jenkins.io/redhat/jenkins.io.key
+            sudo yum install java-1.8.0 -y
+            sudo yum install jenkins -y
+            sudo service jenkins start
+            sudo systemctl enable jenkins
+            sudo service jenkins stop
+            sudo service jenkins restart
+            sudo usermod -a -G wheel jenkins
+            sudo yum install java-1.8.0-openjdk-devel
+            sudo hostnamectl set-hostname control-node-JenkinsAnsible.example.com && bash
+            sudo amazon-linux-extras install ansible2
+            sudo yum install git -y
+            
+       
+      Tags:
+        - Key: Name
+          Value: !Ref EC2InstancePublicInstanceName
+
+
+
+  EC2InstancePrivate:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      KeyName: !Ref Keyname1
+      ImageId: ami-0742b4e673072066f
+      InstanceType: t2.micro
+      SecurityGroupIds: 
+       - !Ref InstanceSecurityGroupPrivate
+      SubnetId: 
+          Fn::ImportValue:
+            !Sub "${RoleStackName}-PrivateSubnet1"
+
+      UserData: 
+        Fn::Base64:
+            !Sub |
+              sudo yum update -y
+              sudo amazon-linux-extras install docker
+              sudo service docker start
+              sudo service docker status
+              sudo usermod -a -G docker ec2-user
+            
+      Tags:
+        - Key: Name
+          Value: !Ref EC2InstancePrivateInstanceName
+
+          
+  InstanceSecurityGroupPublic:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Join [ "-", [ !Ref EnvironmentName, 'ec2-security-group-public' ] ]
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 0.0.0.0/0
+      VpcId:
+       Fn::ImportValue:
+            !Sub "${RoleStackName}-VPC"
+       
+
+       
+  InstanceSecurityGroupPrivate:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Join [ "-", [ !Ref EnvironmentName, 'ec2-security-group-private' ] ]
+      GroupDescription: Enable SSH access via port 22
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 172.20.0.0/16
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 172.20.0.0/16
+      VpcId:
+       Fn::ImportValue:
+            !Sub "${RoleStackName}-VPC"
