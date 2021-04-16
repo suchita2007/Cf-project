@@ -4,7 +4,7 @@
 
 ---------------------------------------------------------------------------------------------------------------
 ## Steps Are as follows
-* Step 1) create a git repo in gitHub as project1 ( see the code in this repo https://github.com/suchita2007/Project1.git)
+* Step 1) create a git repo in gitHub as project1 ( see the code in this repo https://github.com/suchita2007/Cf-project.git)
 * step 2) get the clone of a project on local
 * step 3) create the develop branch
 * step 4) Create feature branch for dev.
